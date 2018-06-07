@@ -1,5 +1,5 @@
 # Introduction
-Do you not like powercli/powershell as much as I do?
+Don't like powercli/powershell?
 
 Do you need to do something with vSphere and you're like `"T_T, I have to get on a Windows VM..."`?
 
