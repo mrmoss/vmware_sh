@@ -5,7 +5,7 @@ Do you need to do something with vSphere and you're like `"T_T, I have to get on
 
 Do you wish administrating vSphere stuff was a bit more like bash?
 
-Wish you could just make a shell script to manage vSphere (because EVERYTHING, including a 90's embedded MIPS security cameras, supports shell scripts...but not Windows)?
+Wish you could just make a shell script to manage vSphere (because EVERYTHING, including 90's embedded MIPS security cameras, supports shell scripts...but not Windows)?
 
 Look no further?
 
