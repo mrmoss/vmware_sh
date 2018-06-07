@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+
+import argparse
+import random
+import string
+import sys
+import vm_shared
+
+if __name__=='__main__':
+	server_obj=None
+
+	try:
+		#Setup cli parser
+		parser=argparse.ArgumentParser(description='Copy VM (recursive copying/globbing is not supported...).')
+		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')
+		parser.add_argument('source',metavar='source',type=str,help='Source folder or VM.')
+		parser.add_argument('destination',metavar='destination',type=str,help='Destination folder or new VM name.')
+		parser.add_argument('-s',metavar='snapshot_name',action='store',type=str,dest='snapshot',help='Name of a snapshot on source to clone from.')
+		parser.add_argument('-n',action='store_true',dest='snapshot_number',help='Use snapshot as a number instead of name.')
+		parser.add_argument('--to-datastore',action='store',type=str,dest='to_datastore',help='New datastore for the cloned VM (default is the src VM\'s datastore).')
+		parser.add_argument('--to-host',action='store',type=str,dest='to_host',help='New host for the cloned VM (default is the src VM\'s host).')
+		args=parser.parse_args()
+
+		#Validate snapshot input
+		if args.snapshot:
+			snapshot=args.snapshot
+			if args.snapshot_number:
+				try:
+					snapshot=int(snapshot)
+					if snapshot<0:
+						raise Exception('')
+				except Exception:
+					raise Exception('"'+str(snapshot)+'" is not a valid snapshot number (needs to be an integer >=0).')
+			else:
+				snapshot=vm_shared.normalize_path_str(snapshot)
+
+		#Normalize paths
+		src=vm_shared.normalize_path_str(args.source)
+		dst=vm_shared.normalize_path_str(args.destination)
+
+		#Source and destination cannot be the same
+		if src==dst or vm_shared.get_path_parent(src)==dst:
+			raise Exception('Source and destination cannot be the same.')
+
+		#Login to server
+		server_obj=vm_shared.verbose_login(args)
+
+		#Get source object
+		src_obj=vm_shared.object_from_str(server_obj,src)
+
+		#Source has to exist
+		if src_obj==None:
+			raise Exception('Source "'+src+'" does not exist.')
+
+		#Source cannot be a datacenter
+		if not vm_shared.obj_is_vm(src_obj):
+			raise Exception('Source object must be a VM.')
+
+		#Get destination object
+		dst_obj=vm_shared.object_from_str(server_obj,dst)
+
+		#Destination exists and is a VM - stop
+		if dst_obj and vm_shared.obj_is_vm(dst_obj):
+			raise Exception('"'+dst+'" exists.')
+
+		#If destination doesn't exist, see if parent does
+		new_machine_name=None
+		if dst_obj==None:
+			new_machine_name=vm_shared.get_path_top(dst)
+			dst=vm_shared.get_path_parent(dst)
+			dst_obj=vm_shared.object_from_str(server_obj,dst)
+
+		#Destination exists and is not a VM - use src VM name
+		else:
+			new_machine_name=vm_shared.get_path_top(src)
+
+			#New destination exists - stop
+			if vm_shared.object_from_str(server_obj,dst+'/'+new_machine_name):
+				raise Exception('Destination "'+dst+'/'+new_machine_name+'" already exists.')
+
+		#Parent doesn't exist - stop
+		if dst_obj==None or (not vm_shared.obj_is_datacenter(dst_obj) and not vm_shared.obj_is_folder(dst_obj)):
+			raise Exception('Destination "'+dst+'" does not exist.')
+
+		#Parent is a datacenter - stop
+		if vm_shared.obj_is_datacenter(dst_obj):
+			raise Exception('Destination cannot be a datacenter.')
+
+		#Get Datastore
+		datastore_obj=None
+		if args.to_datastore:
+			datastore_obj=vm_shared.datastore_from_str_without_datacenter(server_obj,args.to_datastore)
+
+		#Get Host
+		host_obj=None
+		if args.to_host:
+			host_obj=vm_shared.host_from_str_without_datacenter(server_obj,args.to_host)
+
+		#Get Snapshot
+		snapshot_obj=None
+		if args.snapshot:
+			snapshots=vm_shared.get_snapshot_objects(src_obj)
+
+			#VM doesn't have any snapshots - stop
+			if len(snapshots)<=0:
+				raise Exception('No snapshots found on "'+src+'".')
+
+			#Snapshot number is out of bounds - stop
+			if args.snapshot_number and snapshot>=len(snapshots):
+				raise Exception('Snapshot number is out of range (given '+str(snapshot)+' must be <='+str(len(snapshots)-1)+').')
+
+			#Find snapshot to clone from
+			if args.snapshot_number:
+				snapshot_obj=snapshots[snapshot][1]
+			else:
+				for ii in range(len(snapshots)):
+					if snapshots[ii][0]==snapshot:
+						if snapshot_obj:
+							raise Exception('Multiple snapshots named "'+snapshot+'" - specify which one with -n.')
+						snapshot_obj=snapshots[ii][1]
+
+				#Didn't find snapshot - stop
+				if not snapshot_obj:
+					raise Exception('Could not find snapshot named "'+snapshot+'".')
+
+		#Clone
+		sys.stdout.write('Cloning "'+src+'" to "'+dst+'/'+new_machine_name+'"...')
+		sys.stdout.flush()
+		try:
+			vm_shared.vm_copy(server_obj,src_obj,dst_obj,new_machine_name,snapshot_obj,host_obj,datastore_obj)
+			print('success')
+		except Exception:
+			print('fail')
+			raise
+
+	except Exception as error:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Error: '+str(error)+'\n')
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	except KeyboardInterrupt:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	vm_shared.disconnect_server(server_obj)
+	exit(0)

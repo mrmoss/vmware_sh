@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+
+import argparse
+import sys
+import vm_shared
+
+if __name__=='__main__':
+	server_obj=None
+
+	try:
+		#Setup cli parser
+		parser=argparse.ArgumentParser(description='Make folders.')
+		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		parser.add_argument('-P',action='store_true',dest='create_intermediates',help='Create intermediate directories as required.')
+		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')
+		parser.add_argument('path',metavar='PATH',type=str,help='Path to make.')
+		args=parser.parse_args()
+
+		#Login to server
+		server_obj=vm_shared.verbose_login(args)
+
+		#Normalize path
+		path=vm_shared.normalize_path_str(args.path)
+
+		#Object exists
+		obj=vm_shared.object_from_str(server_obj,path)
+		if obj:
+
+			#Folder and no -P - stop
+			if vm_shared.obj_is_folder(obj) and not args.create_intermediates:
+				raise Exception('Path already exists.')
+
+			#Object is a datacenter - stop
+			if vm_shared.obj_is_datacenter(obj):
+				raise Exception('Path is a datacenter.')
+
+			#Object is a VM - stop
+			if vm_shared.obj_is_vm(obj):
+				raise Exception('Path is a VM.')
+
+			exit(0)
+
+		#Parent doesn't exist and no -P - stop
+		path_parent=vm_shared.get_path_parent(path)
+		obj_parent=vm_shared.object_from_str(server_obj,path_parent)
+		if not obj_parent and not args.create_intermediates:
+			raise Exception('Parent path "'+path_parent+'" does not exist (add -P not create intermediates).')
+
+		#Make paths
+		nodes=path.strip('/').split('/')
+		current_path=vm_shared.normalize_path_str(nodes[0])
+		last_obj=vm_shared.object_from_str(server_obj,nodes[0])
+
+		#First node isn't a datacenter - stop
+		if not last_obj or not vm_shared.obj_is_datacenter(last_obj):
+			raise Exception('Path must start with an existing datacenter.')
+
+		#Iterate through nodes
+		for ii in range(1,len(nodes)):
+			current_path+='/'+nodes[ii]
+			new_node=vm_shared.object_from_str(server_obj,current_path)
+			if new_node and not vm_shared.obj_is_folder(new_node):
+				raise Exception('Invalid path - "'+current_path+'" is not a folder.')
+			if not new_node:
+				sys.stdout.write('Making "'+current_path+'"...')
+				sys.stdout.flush()
+				try:
+					vm_shared.mk_folder(server_obj,last_obj,nodes[ii],current_path)
+					print('success')
+				except Exception:
+					print('fail')
+					raise
+			new_node=vm_shared.object_from_str(server_obj,current_path)
+			if new_node:
+				last_obj=new_node
+
+	except Exception as error:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Error: '+str(error)+'\n')
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	except KeyboardInterrupt:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	vm_shared.disconnect_server(server_obj)
+	exit(0)

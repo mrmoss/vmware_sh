@@ -1,0 +1,77 @@
+#!/usr/bin/env python3
+
+import argparse
+import sys
+import vm_shared
+
+if __name__=='__main__':
+	server_obj=None
+
+	try:
+		#Setup cli parser
+		parser=argparse.ArgumentParser(description='List snapshots for VMs.')
+		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		parser.add_argument('-n',action='store_true',dest='no_labels',help='Do not show labels.')
+		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')
+		parser.add_argument('vms',metavar='VM',type=str,nargs='+',help='Show snapshots for each of these VMs.')
+		args=parser.parse_args()
+
+		#Login to server
+		server_obj=vm_shared.verbose_login(args)
+
+		#Get VMs
+		vms=[]
+		for vm in args.vms:
+			vms.append((vm,vm_shared.vm_from_str(server_obj,vm)))
+
+		#Lines variable
+		lines=[]
+
+		#List Snapshots
+		for ii in range(len(args.vms)):
+
+			#Normalize path
+			path=vm_shared.normalize_path_str(args.vms[ii])
+
+			#Get VM
+			vm=vm_shared.vm_from_str(server_obj,path)
+
+			#Print path if multiple are entered
+			if not args.no_labels and len(args.vms)>1:
+				lines.append(path+':')
+
+			#Get Snapshots
+			snapshots=vm_shared.get_snapshot_objects(vm)
+
+			#Print snapshots with line numbers
+			for jj in range(len(snapshots)):
+				current_str=']\t\t'
+				if snapshots[jj][1]==vm.snapshot.currentSnapshot:
+					current_str=' Current]\t'
+				lines.append('['+str(jj)+current_str+snapshots[jj][0])
+
+			#No snapshots, print none
+			if not args.no_labels and len(snapshots)==0:
+				lines.append('No snapshots found.')
+
+			#Newline between entries
+			if not args.no_labels and ii+1<len(args.vms):
+				lines.append('')
+
+		#Print lines
+		for line in lines:
+			print(line)
+
+	except Exception as error:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Error: '+str(error)+'\n')
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	except KeyboardInterrupt:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	vm_shared.disconnect_server(server_obj)
+	exit(0)

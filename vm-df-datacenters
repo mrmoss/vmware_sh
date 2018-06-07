@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+
+import argparse
+import vm_shared
+
+if __name__=='__main__':
+	server_obj=None
+
+	try:
+		#Setup cli parser
+		parser=argparse.ArgumentParser(description='List datastore info for datacenters.')
+		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')
+		parser.add_argument('datacenters',metavar='datacenter',type=str,nargs='*',help='List info for each of these datacenters (default is all).')
+		args=parser.parse_args()
+
+		#Login to server
+		server_obj=vm_shared.verbose_login(args)
+
+		#Get datacenters
+		datacenters=[]
+		if args.datacenters:
+			for datacenter in args.datacenters:
+				datacenters.append(vm_shared.datacenter_from_str(server_obj,datacenter))
+		else:
+			datacenters=vm_shared.get_datacenter_objects(server_obj)
+
+		#Setup labels and default lengths
+		labels=('Datastore','Capacity','Free','Used','%Used')
+		lengths=[]
+		for label in labels:
+			lengths.append(len(label))
+
+		#Go through datacenters
+		for ii in range(len(datacenters)):
+
+			#Datacenter var
+			datacenter=datacenters[ii]
+
+			#Get datastore stats
+			datastore_data=[]
+			for datastore in vm_shared.get_datastore_objects(server_obj,datacenter):
+				name=datastore.name
+				capacity=datastore.summary.capacity
+				free=datastore.summary.freeSpace
+				used=capacity-free
+
+				capacity_gi=str(int(capacity/1000000000))+'Gi'
+				free_gi=str(int(free/1000000000))+'Gi'
+				used_gi=str(int(used/1000000000))+'Gi'
+
+				datastore_data.append((name,capacity_gi,free_gi,used_gi,str(int(used/capacity*100))+'%'))
+
+				if len(name)>lengths[0]:
+					lengths[0]=len(name)
+				if len(capacity_gi)>lengths[1]:
+					lengths[1]=len(capacity_gi)
+				if len(free_gi)>lengths[2]:
+					lengths[2]=len(free_gi)
+				if len(used_gi)>lengths[3]:
+					lengths[3]=len(used_gi)
+
+			#Create the format str based on datastore details
+			format_str=''
+			for jj in range(len(labels)):
+				format_str+='%'+str(lengths[jj])+'s '
+
+			#Print stats for datastores in the current datacenter
+			print(datacenter.name)
+			print(format_str%labels)
+			for data in datastore_data:
+				 print(format_str%data)
+
+			#Add empty line if not the last datacenter
+			if ii+1<len(datacenters):
+				print('')
+
+	except Exception as error:
+		vm_shared.disconnect_server(server_obj)
+		print('Error: '+str(error))
+		print('Stopping...')
+		exit(1)
+
+	except KeyboardInterrupt:
+		vm_shared.disconnect_server(server_obj)
+		print('Stopping...')
+		exit(1)
+
+	vm_shared.disconnect_server(server_obj)
+	exit(0)

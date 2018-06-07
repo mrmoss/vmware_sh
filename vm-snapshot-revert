@@ -1,0 +1,96 @@
+#!/usr/bin/env python3
+
+import argparse
+import sys
+import vm_shared
+
+if __name__=='__main__':
+	server_obj=None
+
+	try:
+		#Setup cli parser
+		parser=argparse.ArgumentParser(description='Revert to a snapshot on a VM.')
+		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')
+		parser.add_argument('vm',metavar='VM',type=str,help='VM to revert.')
+		parser.add_argument('-n',action='store_true',dest='snapshot_number',help='Use snapshot as a number instead of name.')
+		parser.add_argument('snapshot',metavar='snapshot',help='Snapshot to revert to.')
+		args=parser.parse_args()
+
+		#Login to server
+		server_obj=vm_shared.verbose_login(args)
+
+		#Validate snapshot input
+		snapshot=args.snapshot
+		if args.snapshot_number:
+			try:
+				snapshot=int(snapshot)
+				if snapshot<0:
+					raise Exception('')
+			except Exception:
+				raise Exception('"'+str(snapshot)+'" is not a valid snapshot number (needs to be an integer >=0).')
+		else:
+			snapshot=vm_shared.normalize_path_str(snapshot)
+
+		#Normalize path
+		path=vm_shared.normalize_path_str(args.vm)
+		snapshot
+
+		#Get VM
+		vm=vm_shared.vm_from_str(server_obj,path)
+
+		#Get Snapshots
+		snapshots=vm_shared.get_snapshot_objects(vm)
+
+		#VM doesn't have any snapshots - stop
+		if len(snapshots)<=0:
+			raise Exception('No snapshots found.')
+
+		#Snapshot number is out of bounds - stop
+		if args.snapshot_number and snapshot>=len(snapshots):
+			if args.force:
+				exit(0)
+			raise Exception('Snapshot number is out of range (given '+str(snapshot)+' must be <='+str(len(snapshots)-1)+').')
+
+		#Find snapshot to remove
+		snapshot_obj=None
+		snapshot_path=None
+		if args.snapshot_number:
+			snapshot_obj=snapshots[snapshot][1]
+			snapshot_path=snapshots[snapshot][0]
+		else:
+			for ii in range(len(snapshots)):
+				if snapshots[ii][0]==snapshot:
+					if snapshot_obj:
+						raise Exception('Multiple snapshots named "'+snapshot+'" - specify which one with -n.')
+					snapshot_obj=snapshots[ii][1]
+					snapshot_path=snapshots[ii][0]
+
+			#Didn't find snapshot - stop
+			if not snapshot_obj:
+				raise Exception('Could not find snapshot named "'+snapshot+'".')
+
+		#Revert to snapshot
+		try:
+			sys.stdout.write('Reverting "'+path+'" to snapshot "'+snapshot_path+'"...')
+			sys.stdout.flush()
+			vm_shared.vm_snapshot_revert(server_obj,snapshot_obj)
+			print('success')
+
+		except Exception:
+			print('fail')
+			raise
+
+	except Exception as error:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Error: '+str(error)+'\n')
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	except KeyboardInterrupt:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	vm_shared.disconnect_server(server_obj)
+	exit(0)

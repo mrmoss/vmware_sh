@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+
+import argparse
+import sys
+import vm_shared
+
+if __name__=='__main__':
+	server_obj=None
+
+	try:
+		#Setup cli parser
+		parser=argparse.ArgumentParser(description='Remove a snapshot from a VM.')
+		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')
+		parser.add_argument('vm',metavar='VM',type=str,help='VM to remove snapshot from.')
+		group=parser.add_mutually_exclusive_group(required=False)
+		group.add_argument('-a',action='store_true',dest='remove_duplicates',help='If there are more than one snapshots with the given name, remove all of them.')
+		group.add_argument('-n',action='store_true',dest='snapshot_number',help='Use snapshot as a number instead of name.')
+		parser.add_argument('-f',action='store_true',dest='force',help='Ignore snapshot does not exist errors.')
+		parser.add_argument('-r',action='store_true',dest='recursive',help='If a snapshot has children, you must use this flag to remove it.')
+		parser.add_argument('snapshot',metavar='snapshot',help='Snapshot to remove from VM (name by default, number if -n is used).')
+		args=parser.parse_args()
+
+		#Login to server
+		server_obj=vm_shared.verbose_login(args)
+
+		#Validate snapshot input
+		snapshot=args.snapshot
+		if args.snapshot_number:
+			try:
+				snapshot=int(snapshot)
+				if snapshot<0:
+					raise Exception('')
+			except Exception:
+				raise Exception('"'+str(snapshot)+'" is not a valid snapshot number (needs to be an integer >=0).')
+		else:
+			snapshot=vm_shared.normalize_path_str(snapshot)
+
+
+		#Normalize path
+		path=vm_shared.normalize_path_str(args.vm)
+
+		#Get VM
+		vm=vm_shared.vm_from_str(server_obj,path)
+
+		#Get Snapshots
+		snapshots=vm_shared.get_snapshot_objects(vm)
+
+		#VM doesn't have any snapshots - stop
+		if len(snapshots)<=0:
+			if args.force:
+				exit(0)
+			raise Exception('No snapshots found.')
+
+		#Snapshot number is out of bounds - stop
+		if args.snapshot_number and snapshot>=len(snapshots):
+			if args.force:
+				exit(0)
+			raise Exception('Snapshot number is out of range (given '+str(snapshot)+' must be <='+str(len(snapshots)-1)+').')
+
+		#Find snapshot to remove
+		snapshot_path=None
+		snapshot_objs=[]
+		if args.snapshot_number:
+			snapshot_objs.append(snapshots[snapshot][1])
+			snapshot_path=snapshots[snapshot][0]
+		else:
+			for ii in range(len(snapshots)):
+				if snapshots[ii][0]==snapshot:
+					if len(snapshot_objs)>0 and not args.remove_duplicates:
+						raise Exception('Multiple snapshots named "'+snapshot+'" - specify which one with -n or remove them all with -a.')
+					snapshot_objs.append(snapshots[ii][1])
+					snapshot_path=snapshots[ii][0]
+
+			#Didn't find snapshot - stop
+			if len(snapshot_objs)<=0:
+				if args.force:
+					exit(0)
+				raise Exception('Could not find snapshot named "'+snapshot+'".')
+
+		#Check if snapshots have children if not recursive:
+		if not args.recursive:
+			for snapshot in snapshots:
+				if snapshot[0]!=snapshot_path and snapshot[0].find(snapshot_path)==0:
+					raise Exception('Snapshot has children - either remove children first or use -r.')
+
+		#Remove snapshot
+		try:
+			for snapshot_obj in snapshot_objs:
+				sys.stdout.write('Removing snapshot "'+snapshot_path+'" from "'+path+'"...')
+				sys.stdout.flush()
+				vm_shared.vm_snapshot_remove(server_obj,snapshot_obj)
+				print('success')
+
+		except Exception:
+			print('fail')
+			raise
+
+	except Exception as error:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Error: '+str(error)+'\n')
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	except KeyboardInterrupt:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	vm_shared.disconnect_server(server_obj)
+	exit(0)

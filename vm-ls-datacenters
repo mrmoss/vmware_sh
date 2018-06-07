@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+
+import argparse
+import sys
+import vm_shared
+
+if __name__=='__main__':
+	server_obj=None
+
+	try:
+		#Setup cli parser
+		parser=argparse.ArgumentParser(description='List cluster and host info for datacenters.')
+		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')
+		parser.add_argument('datacenters',metavar='datacenter',type=str,nargs='*',help='List info for each of these datacenters (default is all).')
+		args=parser.parse_args()
+
+		#Login to server
+		server_obj=vm_shared.verbose_login(args)
+
+		#Get datacenters
+		datacenters=[]
+		if args.datacenters:
+			for datacenter in args.datacenters:
+				datacenters.append(vm_shared.datacenter_from_str(server_obj,datacenter).name)
+		else:
+			datacenters=vm_shared.list_datacenters(server_obj)
+
+		#Setup labels and default lengths
+		labels=('Datastore','Capacity','Free','Used','%Used')
+		lengths=[]
+		for label in labels:
+			lengths.append(len(label))
+
+		#Go through datacenters
+		for datacenter in datacenters:
+			print(datacenter)
+			for cluster in vm_shared.list_clusters(server_obj,datacenter):
+				print('\t'+cluster)
+				for host in vm_shared.list_hosts(server_obj,datacenter,cluster):
+					print('\t\t'+host)
+
+	except Exception as error:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Error: '+str(error)+'\n')
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	except KeyboardInterrupt:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	vm_shared.disconnect_server(server_obj)
+	exit(0)

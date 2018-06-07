@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+
+import argparse
+import sys
+import vm_shared
+
+if __name__=='__main__':
+	server_obj=None
+
+	try:
+		#Setup cli parser
+		parser=argparse.ArgumentParser(description='Remove a folder or VM.')
+		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		parser.add_argument('-f',action='store_true',dest='force',help='Ignore snapshot does not exist errors.')
+		parser.add_argument('-r',action='store_true',dest='recursive',help='If path is a folder, you must use this flag to remove it.')
+		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')
+		parser.add_argument('path',metavar='PATH',type=str,help='Path to remove (folder or VM).')
+		args=parser.parse_args()
+
+		#Login to server
+		server_obj=vm_shared.verbose_login(args)
+
+		#Normalize path
+		path=vm_shared.normalize_path_str(args.path)
+
+		#Get Object
+		obj=vm_shared.object_from_str(server_obj,path)
+
+		#Datacenter - stop
+		if vm_shared.obj_is_datacenter(obj):
+			raise Exception('Path cannot be a datacenter.')
+
+		#Folder and not recursive - stop
+		if vm_shared.obj_is_folder(obj) and not args.recursive:
+			raise Exception('Path is a folder - use -r to remove.')
+
+		#Remove
+		sys.stdout.write('Removing "'+path+'"...')
+		sys.stdout.flush()
+		try:
+			vm_shared.obj_remove(server_obj,obj)
+			print('success')
+		except Exception:
+			print('fail')
+			raise
+
+	except Exception as error:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Error: '+str(error)+'\n')
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	except KeyboardInterrupt:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	vm_shared.disconnect_server(server_obj)
+	exit(0)

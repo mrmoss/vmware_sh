@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+
+import argparse
+import sys
+import vm_shared
+
+if __name__=='__main__':
+	server_obj=None
+
+	try:
+		#Setup cli parser
+		parser=argparse.ArgumentParser(description='Take a snapshot of a VM.')
+		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')
+		parser.add_argument('vm',metavar='VM',type=str,help='Snapshot this VM.')
+		parser.add_argument('snapshot_name',metavar='snapshot_name',type=str,help='New snapshot name.')
+		args=parser.parse_args()
+
+		#Login to server
+		server_obj=vm_shared.verbose_login(args)
+
+		#Get VM
+		vm=vm_shared.vm_from_str(server_obj,args.vm)
+
+		#Take snapshot
+		sys.stdout.write('Creating snapshot "'+args.snapshot_name+'" on "'+vm_shared.normalize_path_str(args.vm)+'"...')
+		sys.stdout.flush()
+		try:
+			vm_shared.vm_snapshot(server_obj,vm,args.snapshot_name)
+			print('success')
+		except Exception:
+			print('fail')
+			raise
+
+	except Exception as error:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Error: '+str(error)+'\n')
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	except KeyboardInterrupt:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	vm_shared.disconnect_server(server_obj)
+	exit(0)

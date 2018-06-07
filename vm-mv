@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+
+import argparse
+import random
+import string
+import sys
+import vm_shared
+
+if __name__=='__main__':
+	server_obj=None
+
+	try:
+		#Setup cli parser
+		parser=argparse.ArgumentParser(description='Move folder or VM to a new folder or name (globbing is not supported...).')
+		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')
+		parser.add_argument('source',metavar='source',type=str,help='Source folder or VM.')
+		parser.add_argument('destination',metavar='destination',type=str,help='Destination folder or new VM name.')
+		args=parser.parse_args()
+
+		#Normalize paths
+		src=vm_shared.normalize_path_str(args.source)
+		dst=vm_shared.normalize_path_str(args.destination)
+
+		#Source and destination cannot be the same
+		if src==dst or vm_shared.get_path_parent(src)==dst:
+			raise Exception('Source and destination cannot be the same.')
+
+		#Login to server
+		server_obj=vm_shared.verbose_login(args)
+
+		#Get source object
+		src_obj=vm_shared.object_from_str(server_obj,src)
+
+		#Source has to exist
+		if src_obj==None:
+			raise Exception('Source "'+src+'" does not exist.')
+
+		#Source cannot be a datacenter
+		if vm_shared.obj_is_datacenter(src_obj):
+			raise Exception('Cannot move a datacenter.')
+
+		#Get destination object
+		dst_obj=vm_shared.object_from_str(server_obj,dst)
+
+		#Destination exists and is a VM - stop
+		if dst_obj and vm_shared.obj_is_vm(dst_obj):
+			raise Exception('"'+dst+'" exists.')
+
+		#If destination doesn't exist, see if parent does
+		new_machine_name=None
+		if dst_obj==None:
+			new_machine_name=vm_shared.get_path_top(dst)
+			dst=vm_shared.get_path_parent(dst)
+			dst_obj=vm_shared.object_from_str(server_obj,dst)
+
+		#Destination exists and is not a VM - use src VM name
+		else:
+			new_machine_name=vm_shared.get_path_top(src)
+
+			#New destination exists - stop
+			if vm_shared.object_from_str(server_obj,dst+'/'+new_machine_name):
+				raise Exception('Destination "'+dst+'/'+new_machine_name+'" already exists.')
+
+		#Parent doesn't exist - stop
+		if dst_obj==None or (not vm_shared.obj_is_datacenter(dst_obj) and not vm_shared.obj_is_folder(dst_obj)):
+			raise Exception('Destination "'+dst+'" does not exist.')
+
+		#Datacenter is different...not supported
+		if src.split('/')[0]!=dst.split('/'):
+			raise Exception('Datacenter change - Not supported...vm-cp and then vm-rm original to move.')
+
+		#If parents are the same, and new machine name, just rename and exit
+		if vm_shared.get_path_parent(src)==dst and new_machine_name:
+			sys.stdout.write('Renaming to "'+dst+'/'+new_machine_name+'"...')
+			sys.stdout.flush()
+			try:
+				vm_shared.rename_obj(server_obj,src_obj,new_machine_name)
+				print('success')
+				exit(0)
+			except Exception:
+				print('fail')
+				raise
+
+		#If we need to rename the VM, rename it to a random name temporarily
+		random_machine_name=None
+		if new_machine_name:
+			while True:
+				random_machine_name=''.join(random.choice(string.ascii_uppercase+string.digits) for _ in range(30))
+				if vm_shared.object_from_str(server_obj,vm_shared.get_path_parent(src)+'/'+random_machine_name)==None and vm_shared.object_from_str(server_obj,dst+'/'+random_machine_name)==None:
+					break
+			sys.stdout.write('Temporarily renaming to "'+vm_shared.get_path_parent(src)+'/'+random_machine_name+'"...')
+			sys.stdout.flush()
+			try:
+				vm_shared.rename_obj(server_obj,src_obj,random_machine_name)
+				print('success')
+			except Exception:
+				print('fail')
+				raise
+
+		#Destination exists and is a datacenter or folder - move VM
+		if dst_obj and (vm_shared.obj_is_datacenter(dst_obj) or vm_shared.obj_is_folder(dst_obj)):
+			src_str=src
+			if random_machine_name:
+				src_str=vm_shared.get_path_parent(src)+'/'+random_machine_name
+			sys.stdout.write('Moving "'+src_str+'" into "'+dst+'"...')
+			sys.stdout.flush()
+			try:
+				vm_shared.mv_obj(server_obj,src_obj,dst_obj)
+				print('success')
+			except Exception:
+				print('fail')
+				raise
+
+		#If we did a temporary rename, rename to the new name
+		if new_machine_name:
+			sys.stdout.write('Renaming to "'+dst+'/'+new_machine_name+'"...')
+			sys.stdout.flush()
+			try:
+				vm_shared.rename_obj(server_obj,src_obj,new_machine_name)
+				print('success')
+			except Exception:
+				print('fail')
+				raise
+
+	except Exception as error:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Error: '+str(error)+'\n')
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	except KeyboardInterrupt:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	vm_shared.disconnect_server(server_obj)
+	exit(0)

@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+
+import argparse
+import sys
+import vm_shared
+
+if __name__=='__main__':
+	server_obj=None
+
+	try:
+		#Setup cli parser
+		parser=argparse.ArgumentParser(description='Poweroff VMs.')
+		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')
+		parser.add_argument('vms',metavar='VM',type=str,nargs='+',help='Poweroff each of these VMs.')
+		args=parser.parse_args()
+
+		#Login to server
+		server_obj=vm_shared.verbose_login(args)
+
+		#Get VMs
+		vms=[]
+		for vm in args.vms:
+			vms.append((vm,vm_shared.vm_from_str(server_obj,vm)))
+
+		#Go through vms
+		for vm in vms:
+
+			#Poweroff VM
+			sys.stdout.write('Powering off "'+vm_shared.normalize_path_str(vm[0])+'"...')
+			sys.stdout.flush()
+			try:
+				vm_shared.poweroff_vm_obj(server_obj,vm[1])
+				print('done')
+			except Exception:
+				print('failed')
+				raise
+
+	except Exception as error:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Error: '+str(error)+'\n')
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	except KeyboardInterrupt:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	vm_shared.disconnect_server(server_obj)
+	exit(0)

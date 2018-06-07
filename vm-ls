@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+
+import argparse
+import sys
+import vm_shared
+
+if __name__=='__main__':
+	server_obj=None
+
+	try:
+		#Setup cli parser
+		parser=argparse.ArgumentParser(description='List folder and VM structures (globbing is not supported...).')
+		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		group=parser.add_mutually_exclusive_group(required=False)
+		group.add_argument('-f',action='store_true',dest='folders_only',help='Only show folders.')
+		group.add_argument('-m',action='store_true',dest='machines_only',help='Only show VMs.')
+		parser.add_argument('-l',action='store_true',dest='full_paths',help='List full paths.')
+		parser.add_argument('-n',action='store_true',dest='no_labels',help='Do not show labels.')
+		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')
+		parser.add_argument('paths',metavar='PATH',type=str,nargs='*',help='List structures in these paths (default is the root of the server).')
+		args=parser.parse_args()
+
+		#Login to server
+		server_obj=vm_shared.verbose_login(args)
+
+		#No args means default is root folder
+		if len(args.paths)==0:
+			args.paths.append('/')
+
+		#Lines variable
+		lines=[]
+
+		#List Structures
+		for ii in range(len(args.paths)):
+
+			#Normalize path
+			path=vm_shared.normalize_path_str(args.paths[ii])
+
+			#Print path if multiple are entered
+			if not args.no_labels and len(args.paths)>1:
+				lines.append(path+':')
+
+			#Root shows datacenters
+			if path=='/':
+				if not args.machines_only:
+					structures=vm_shared.list_datacenters(server_obj)
+					if args.full_paths:
+						for ii in range(len(structures)):
+							structures[ii]='/'+structures[ii]
+				else:
+					structures=[]
+
+			#Anything else show structures
+			else:
+				structures=vm_shared.list_structures(server_obj,path,args.full_paths,args.folders_only,args.machines_only)
+
+			#Sort and print
+			structures.sort()
+			for structure in structures:
+				lines.append(structure)
+
+			#Newline between entries
+			if not args.no_labels and ii+1<len(args.paths):
+				lines.append('')
+
+		#Print lines
+		for line in lines:
+			print(line)
+
+	except Exception as error:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Error: '+str(error)+'\n')
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	except KeyboardInterrupt:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	vm_shared.disconnect_server(server_obj)
+	exit(0)

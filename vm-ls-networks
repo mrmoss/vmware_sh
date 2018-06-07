@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+
+import argparse
+import sys
+import vm_shared
+
+if __name__=='__main__':
+	server_obj=None
+
+	try:
+		#Setup cli parser
+		parser=argparse.ArgumentParser(description='List network info for hosts.')
+		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')
+		parser.add_argument('hosts',metavar='host',type=str,nargs='*',help='List info for each of these hosts (default is all).')
+		args=parser.parse_args()
+
+		#Login to server
+		server_obj=vm_shared.verbose_login(args)
+
+		#Get hosts
+		hosts=[]
+		if args.hosts:
+			for host in args.hosts:
+				hosts.append(vm_shared.host_from_str_without_datacenter(server_obj,host))
+		else:
+			hosts=vm_shared.get_all_host_objects(server_obj)
+			hosts.sort(key=lambda x:x.name)
+
+		for ii in range(len(hosts)):
+			print(hosts[ii].name)
+			names=[]
+			for network in vm_shared.get_network_objects(server_obj,hosts[ii]):
+				names.append(network.name)
+			names.sort
+			for name in names:
+				print('\t'+name)
+			if ii+1<len(hosts):
+				print('')
+
+	except Exception as error:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Error: '+str(error)+'\n')
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	except KeyboardInterrupt:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	vm_shared.disconnect_server(server_obj)
+	exit(0)
