@@ -9,7 +9,7 @@ if __name__=='__main__':
 
 	try:
 		#Setup cli parser
-		parser=argparse.ArgumentParser(description='List network info for hosts.')
+		parser=argparse.ArgumentParser(description='List networks for hosts.')
 		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
 		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')
 		parser.add_argument('hosts',metavar='host',type=str,nargs='*',help='List info for each of these hosts (default is all).')

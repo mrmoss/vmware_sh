@@ -40,12 +40,12 @@ That's it.
 
 Example password file:
 mike@vc.example.com,123456seven
-mike@vc.example2.com,rootpass 
+mike@vc.example2.com,rootpass
 ```
 
 ## Show all datastore info
 ```
-./vm-df-datacenters mike@vc.example.com
+./vm-datacenter-df mike@vc.example.com
 Attempting to connect as "mike" to "vc.example.com"...
 	Password:
 	Connected
@@ -65,7 +65,7 @@ ds-bravo-san1-vms2   2198Gi  397Gi 1801Gi   81%
 
 ## Show all datastore info for datastores in the 'Alpha Datacenter'
 ```
-./vm-df-datacenters mike@vc.example.com 'Alpha Datacenter'
+./vm-datacenter-df mike@vc.example.com 'Alpha Datacenter'
 Attempting to connect as "mike" to "vc.example.com"...
 	Password:
 	Connected
@@ -79,7 +79,7 @@ ds-alpha-san0-vms2   2198Gi  397Gi 1801Gi   81%
 
 ## Show clusters and hosts for all datacenters
 ```
-./vm-ls-datacenters mike@vc.example.com
+./vm-datacenter-ls mike@vc.example.com
 Attempting to connect as "mike" to "vc.example.com"...
 	Password:
 	Connected
@@ -98,7 +98,7 @@ Bravo Datacenter
 
 ## Show clusters and hosts in the 'Bravo Datacenter'
 ```
-./vm-ls-datacenters mike@vc.example.com Bravo\ Datacenter
+./vm-datacenter-ls mike@vc.example.com Bravo\ Datacenter
 Attempting to connect as "mike" to "vc.example.com"...
 	Password:
 	Connected
@@ -112,7 +112,7 @@ Bravo Datacenter
 
 ## Show all network info for all hosts
 ```
-./vm-ls-networks mike@vc.example.com
+./vm-network-ls mike@vc.example.com
 Attempting to connect as "mike" to "vc.example.com"...
 	Password:
 	Connected
@@ -132,7 +132,7 @@ vs1.alpha.example.com
 
 ## Show all network info for the given two hosts
 ```
-./vm-ls-networks mike@vc.example.com vs2.bravo.example.com vs0.alpha.example.com
+./vm-network-ls mike@vc.example.com vs2.bravo.example.com vs0.alpha.example.com
 Attempting to connect as "mike" to "vc.example.com"...
 	Password:
 	Connected
