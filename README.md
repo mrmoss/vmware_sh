@@ -526,7 +526,7 @@ Connected:        False
 IPs:              Unknown
 ```
 
-## Change the network on an interface for a VM
+## Change the network of a VM interface
 ```
 ./vm-ifconfig-mv mike@vc.example.com 'Alpha Datacenter/base/linux/arch' 'Network adapter 1' NETWORK_1
 Attempting to connect as "mike" to "vc.example.com"...
