@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+
+import argparse
+import sys
+import vm_shared
+
+if __name__=='__main__':
+	server_obj=None
+
+	try:
+		#Setup cli parser
+		parser=argparse.ArgumentParser(description='Delete permissions from folder and VM structures (globbing is not supported...).')
+		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		parser.add_argument('-f',action='store_true',dest='force',help='Ignore permission does not exist on object errors.')
+		parser.add_argument('--role',action='store',type=str,dest='role',help='Permission role to delete from paths.')
+		parser.add_argument('--domain-user',action='store',type=str,dest='domain_user',help='Domain user to delete permissions from.')
+		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')
+		parser.add_argument('paths',metavar='PATH',type=str,nargs='+',help='Delete permission from these paths.')
+		args=parser.parse_args()
+
+		#Login to server
+		server_obj=vm_shared.verbose_login(args)
+
+		#Get role id
+		role_id=None
+		if args.role:
+			role_id=vm_shared.role_id_from_str(server_obj,args.role)
+
+		#Get domain and user
+		user_obj=None
+		if args.domain_user:
+			user_obj=vm_shared.user_from_str(server_obj,args.domain_user)
+
+		#No role or domain user - stop
+		if role_id==None and user_obj==None:
+			raise Exception('You must use at least one of --role or --domain-user')
+
+		#Get Objects
+		objs=[]
+		for path in args.paths:
+			path=vm_shared.normalize_path_str(path)
+			obj=vm_shared.object_from_str(server_obj,path)
+
+			#Object doesn't exist - stop
+			if not obj:
+				raise Exception('"'+path+'" does not exist.')
+
+			#Datacenter - stop
+			if vm_shared.object_is_datacenter(obj):
+				raise Exception('"'+path+'" is a datacenter.')
+
+			objs.append([path,obj])
+
+		#Delete permissions
+		for obj in objs:
+			try:
+				if role_id and not user_obj:
+					sys.stdout.write('Deleting role "'+args.role+'" from "'+obj[0]+'"...')
+				elif not role_id and user_obj:
+					sys.stdout.write('Deleting user "'+vm_shared.user_object_to_str(user_obj)+' from "'+obj[0]+'"...')
+				else:
+					sys.stdout.write('Deleting user "'+vm_shared.user_object_to_str(user_obj)+'" as role "'+args.role+'" from "'+obj[0]+'"...')
+				sys.stdout.flush()
+				vm_shared.del_user_perm(server_obj,role_id,user_obj,obj[1],args.force)
+				print('success')
+			except Exception:
+				print('fail')
+				raise
+
+	except Exception as error:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Error: '+str(error)+'\n')
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	except KeyboardInterrupt:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	vm_shared.disconnect_server(server_obj)
+	exit(0)

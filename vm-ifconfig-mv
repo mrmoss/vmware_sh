@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+
+import argparse
+import sys
+import vm_shared
+
+if __name__=='__main__':
+	server_obj=None
+
+	try:
+		#Setup cli parser
+		parser=argparse.ArgumentParser(description='Change the network of a network interface for a VM.')
+		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')
+		parser.add_argument('vm',metavar='VM',type=str,help='Change network interface for this VM.')
+		parser.add_argument('interface_name',type=str,help='Change the interface with this name.')
+		parser.add_argument('new_network_name',type=str,help='Change the interface to this network (must be on the same host as the VM).')
+		args=parser.parse_args()
+
+		#Login to server
+		server_obj=vm_shared.verbose_login(args)
+
+		#Get VM
+		vm_path=vm_shared.normalize_path_str(args.vm)
+		vm_obj=vm_shared.vm_from_str(server_obj,vm_path)
+
+		#Get nic info for VM and find given nic
+		nics=vm_shared.get_interface_info(server_obj,vm_obj)
+		nic_obj=None
+		for key in nics:
+			nic=nics[key]
+			if nic['name']==args.interface_name:
+				nic_obj=nic
+				break
+
+		#Didn't find nic - stop
+		if not nic_obj:
+			raise Exception('Could not find nic "'+args.interface_name+'" on "'+vm_path+'"')
+
+		#Network is already set - done
+		if nic_obj['network']==args.new_network_name:
+			print('Interface "'+nic_obj['name']+'" on "'+vm_path+'" is already set to "'+nic_obj['network']+'".')
+			exit(0)
+
+		#Make sure new network exists
+		network_obj=None
+		for network in vm_shared.get_network_objects(server_obj,vm_obj.runtime.host):
+			if network.name==args.new_network_name:
+				network_obj=network
+				break
+
+		#Didn't find network - stop
+		if not network_obj:
+			raise Exception('Could not find network "'+args.new_network_name+'" on "'+vm_obj.runtime.host.name+'"')
+
+		#Change network
+		sys.stdout.write('Changing network of "'+nic_obj['name']+'" to "'+args.new_network_name+'" on "'+vm_path+'"...')
+		sys.stdout.flush()
+		try:
+			vm_shared.change_interface_network(server_obj,vm_obj,nic_obj,network_obj)
+			print('success')
+		except Exception:
+			print('fail')
+			raise
+
+
+	except Exception as error:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Error: '+str(error)+'\n')
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	except KeyboardInterrupt:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	vm_shared.disconnect_server(server_obj)
+	exit(0)

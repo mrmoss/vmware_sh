@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+
+import argparse
+import sys
+import vm_shared
+
+if __name__=='__main__':
+	server_obj=None
+
+	try:
+		#Setup cli parser
+		parser=argparse.ArgumentParser(description='Add permissions to folder and VM structures (globbing is not supported...).')
+		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')
+		parser.add_argument('role',type=str,help='Permission role to add to paths.')
+		parser.add_argument('domain_user',metavar='domain/user',type=str,help='Domain user to add permissions to.')
+		parser.add_argument('paths',metavar='PATH',type=str,nargs='+',help='Add permission to these paths.')
+		args=parser.parse_args()
+
+		#Login to server
+		server_obj=vm_shared.verbose_login(args)
+
+		#Get role id
+		role_id=vm_shared.role_id_from_str(server_obj,args.role)
+
+		#Get domain and user
+		user_obj=vm_shared.user_from_str(server_obj,args.domain_user)
+
+		#Get Objects
+		objs=[]
+		for path in args.paths:
+			path=vm_shared.normalize_path_str(path)
+			obj=vm_shared.object_from_str(server_obj,path)
+
+			#Object doesn't exist - stop
+			if not obj:
+				raise Exception('"'+path+'" does not exist.')
+
+			#Datacenter - stop
+			if vm_shared.object_is_datacenter(obj):
+				raise Exception('"'+path+'" is a datacenter.')
+
+			objs.append([path,obj])
+
+		#Add permissions
+		for obj in objs:
+			try:
+				sys.stdout.write('Adding user "'+vm_shared.user_object_to_str(user_obj)+'" as role "'+args.role+'" to "'+obj[0]+'"...')
+				sys.stdout.flush()
+				vm_shared.add_user_perm(server_obj,role_id,user_obj,obj[1])
+				print('success')
+			except Exception:
+				print('fail')
+				raise
+
+	except Exception as error:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Error: '+str(error)+'\n')
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	except KeyboardInterrupt:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	vm_shared.disconnect_server(server_obj)
+	exit(0)

@@ -26,12 +26,8 @@ That's it.
 
 # Todo
 1. vm-migrate
-2. vm-permission-ls
-3. vm-permission-add
-4. vm-permission-rm
-5. vm-ifconfig-ls
-6. vm-ifconfig-mv
-7. vm-ifconfig-rm
+2. Make vm-cp work for across vcenters...
+3. Added globbing and such for most of these commands...
 
 # Usage examples
 ## Standard usage
@@ -454,4 +450,87 @@ Attempting to connect as "mike" to "vc.example.com"...
 
 Making "/Alpha Datacenter/experiments/new_folder_parent"...success
 Making "/Alpha Datacenter/experiments/new_folder_parent/new_folder_child"...success
+```
+
+## List permissions for an object
+```
+./vm-perm-ls mike@vc.example.com 'Alpha Datacenter/base/linux/arch'
+Attempting to connect as "mike" to "vc.example.com"...
+	Connected
+
+MIKES-DOMAIN\guest1,GUEST
+MIKES-DOMAIN\guest2,GUEST
+MIKES-DOMAIN\somedude,POWERUSER
+```
+
+## Add permissions to an object (note that a \ and / are interchangable...)
+```
+./vm-perm-add mike@vc.example.com GUEST MIKES-DOMAIN/someotherdude 'Alpha Datacenter/base/linux/arch' 'Alpha Datacenter/base/linux/centos'
+Attempting to connect as "mike" to "vc.example.com"...
+	Connected
+
+Adding user "MIKES-DOMAIN\someotherdude" as role "GUEST" to "/Alpha Datacenter/base/linux/arch"...success
+Adding user "MIKES-DOMAIN\someotherdude" as role "GUEST" to "/Alpha Datacenter/base/linux/centos"...success
+```
+
+## Remove permission based on user (note that a \ and / are interchangable...)
+```
+./vm-perm-del mike@vc.example.com --domain-user MIKES-DOMAIN/someotherdude 'Alpha Datacenter/base/linux/arch' 'Alpha Datacenter/base/linux/centos'
+Attempting to connect as "mike" to "vc.example.com"...
+	Connected
+
+Deleting user "MIKES-DOMAIN\someotherdude" from "/Alpha Datacenter/base/linux/arch"...success
+Deleting user "MIKES-DOMAIN\someotherdude" from "/Alpha Datacenter/base/linux/centos"...success
+```
+
+## Remove permission based on user and role (note that a \ and / are interchangable...)
+```
+./vm-perm-del mike@vc.example.com --role POWERUSER --domain-user MIKES-DOMAIN/somedude 'Alpha Datacenter/base/linux/arch' 'Alpha Datacenter/base/linux/centos'
+Attempting to connect as "mike" to "vc.example.com"...
+	Connected
+
+Deleting user "MIKES-DOMAIN\somedude" as "POWERUSER" from "/Alpha Datacenter/base/linux/arch"...success
+Deleting user "MIKES-DOMAIN\somedude" as "POWERUSER" from "/Alpha Datacenter/base/linux/centos"...success
+```
+
+## Remove permission based on role
+```
+./vm-perm-del mike@vc.example.com --role GUEST 'Alpha Datacenter/base/linux/arch' 'Alpha Datacenter/base/linux/centos'
+Attempting to connect as "mike" to "vc.example.com"...
+	Connected
+
+Deleting role "GUEST" from "/Alpha Datacenter/base/linux/arch"...success
+Deleting role "GUEST" from "/Alpha Datacenter/base/linux/centos"...success
+```
+
+## List interface information for a VM
+```
+./vm-ifconfig-ls mike@vc.example.com 'Alpha Datacenter/base/linux/arch'
+Attempting to connect as "mike" to "vc.example.com"...
+	Connected
+
+Name:             "Network adapter 1"
+Network:          "NETWORK_2"
+Host:             "vs0.alpha.example.com"
+Mac Address:      00:00:00:00:00:00
+Connect on boot:  True
+Connected:        True
+IPs:              192.168.1.2/24, [fe::1]/64
+
+Name:             "Network adapter 2"
+Network:          "NETWORK_3"
+Host:             "vs0.alpha.example.com"
+Mac Address:      00:00:00:00:00:01
+Connect on boot:  True
+Connected:        False
+IPs:              Unknown
+```
+
+## Change the network on an interface for a VM
+```
+./vm-ifconfig-mv mike@vc.example.com 'Alpha Datacenter/base/linux/arch' 'Network adapter 1' NETWORK_1
+Attempting to connect as "mike" to "vc.example.com"...
+	Connected
+
+Changing network of "Network adapter 1" to "NETWORK_1" on "/Alpha Datacenter/base/linux/arch"...success
 ```

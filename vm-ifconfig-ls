@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+
+import argparse
+import sys
+import vm_shared
+
+if __name__=='__main__':
+	server_obj=None
+
+	try:
+		#Setup cli parser
+		parser=argparse.ArgumentParser(description='List network interfaces for a VM.')
+		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')
+		parser.add_argument('vm',metavar='VM',type=str,help='List network interfaces for this VM.')
+		args=parser.parse_args()
+
+		#Login to server
+		server_obj=vm_shared.verbose_login(args)
+
+		#Get and print nics
+		count=0
+		nics=vm_shared.get_interface_info(server_obj,vm_shared.vm_from_str(server_obj,vm_shared.normalize_path_str(args.vm)))
+		for key in nics:
+
+			#Print info
+			nic=nics[key]
+			print('Name:             "'+nic['name']+'"')
+			print('Network:          "'+nic['network']+'"')
+			print('Host:             "'+nic['host']+'"')
+			print('Mac Address:      '+nic['mac'])
+			print('Connect on boot:  '+str(nic['connect_on_boot']))
+			print('Connected:        '+str(nic['connected']))
+			if len(nic['addresses'])==0:
+				nic['addresses'].append('Unknown')
+			print('IPs:              '+', '.join(nic['addresses']))
+
+			#Newline between entries
+			if count+1<len(nics):
+				print('')
+			count+=1
+
+	except Exception as error:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Error: '+str(error)+'\n')
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	except KeyboardInterrupt:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	vm_shared.disconnect_server(server_obj)
+	exit(0)

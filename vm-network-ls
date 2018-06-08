@@ -32,7 +32,7 @@ if __name__=='__main__':
 			names=[]
 			for network in vm_shared.get_network_objects(server_obj,hosts[ii]):
 				names.append(network.name)
-			names.sort
+			names.sort()
 			for name in names:
 				print('\t'+name)
 			if ii+1<len(hosts):

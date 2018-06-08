@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+
+import argparse
+import sys
+import vm_shared
+
+if __name__=='__main__':
+	server_obj=None
+
+	try:
+		#Setup cli parser
+		parser=argparse.ArgumentParser(description='List user permissions of folder and VM structures (globbing is not supported...).')
+		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		parser.add_argument('-n',action='store_true',dest='no_labels',help='Do not show labels.')
+		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')
+		parser.add_argument('paths',metavar='PATH',type=str,nargs='+',help='List permissions of these paths.')
+		args=parser.parse_args()
+
+		#Login to server
+		server_obj=vm_shared.verbose_login(args)
+
+		#Get Objects
+		objs=[]
+		for path in args.paths:
+			path=vm_shared.normalize_path_str(path)
+			obj=vm_shared.object_from_str(server_obj,path)
+
+			#Object doesn't exist - stop
+			if not obj:
+				raise Exception('"'+path+'" does not exist.')
+
+			#Datacenter - stop
+			if vm_shared.object_is_datacenter(obj):
+				raise Exception('"'+path+'" is a datacenter.')
+
+			objs.append([path,obj])
+
+		#Lines to print
+		lines=[]
+
+		#List permissions
+		for ii in range(len(objs)):
+			obj=objs[ii]
+
+			#Labels or no labels, that is the question
+			indent_str=''
+			if not args.no_labels and len(objs)>1:
+				lines.append(objs[ii][0]+':')
+				indent_str='\t'
+
+			#Sort and print perms
+			perm_lines=[]
+			for perm in vm_shared.list_user_perms(server_obj,objs[ii][1]):
+				perm_lines.append(indent_str+perm.principal+','+vm_shared.role_str_from_id(server_obj,perm.roleId))
+			perm_lines.sort()
+			for perm in perm_lines:
+				lines.append(perm)
+
+			#No perms - print
+			if not args.no_labels and len(perm_lines)==0:
+				lines.append(indent_str+'No permissions found.')
+
+			#Newline between entries
+			if not args.no_labels and ii+1<len(args.paths):
+				lines.append('')
+
+		#Print lines
+		for line in lines:
+			print(line)
+
+	except Exception as error:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Error: '+str(error)+'\n')
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	except KeyboardInterrupt:
+		vm_shared.disconnect_server(server_obj)
+		sys.stderr.write('Stopping...\n')
+		exit(1)
+
+	vm_shared.disconnect_server(server_obj)
+	exit(0)

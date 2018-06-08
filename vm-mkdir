@@ -27,15 +27,15 @@ if __name__=='__main__':
 		if obj:
 
 			#Folder and no -P - stop
-			if vm_shared.obj_is_folder(obj) and not args.create_intermediates:
+			if vm_shared.object_is_folder(obj) and not args.create_intermediates:
 				raise Exception('Path already exists.')
 
 			#Object is a datacenter - stop
-			if vm_shared.obj_is_datacenter(obj):
+			if vm_shared.object_is_datacenter(obj):
 				raise Exception('Path is a datacenter.')
 
 			#Object is a VM - stop
-			if vm_shared.obj_is_vm(obj):
+			if vm_shared.object_is_vm(obj):
 				raise Exception('Path is a VM.')
 
 			exit(0)
@@ -52,14 +52,14 @@ if __name__=='__main__':
 		last_obj=vm_shared.object_from_str(server_obj,nodes[0])
 
 		#First node isn't a datacenter - stop
-		if not last_obj or not vm_shared.obj_is_datacenter(last_obj):
+		if not last_obj or not vm_shared.object_is_datacenter(last_obj):
 			raise Exception('Path must start with an existing datacenter.')
 
 		#Iterate through nodes
 		for ii in range(1,len(nodes)):
 			current_path+='/'+nodes[ii]
 			new_node=vm_shared.object_from_str(server_obj,current_path)
-			if new_node and not vm_shared.obj_is_folder(new_node):
+			if new_node and not vm_shared.object_is_folder(new_node):
 				raise Exception('Invalid path - "'+current_path+'" is not a folder.')
 			if not new_node:
 				sys.stdout.write('Making "'+current_path+'"...')

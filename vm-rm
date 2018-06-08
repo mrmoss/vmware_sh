@@ -33,18 +33,18 @@ if __name__=='__main__':
 			raise Exception('Path does not exist.')
 
 		#Datacenter - stop
-		if vm_shared.obj_is_datacenter(obj):
+		if vm_shared.object_is_datacenter(obj):
 			raise Exception('Path cannot be a datacenter.')
 
 		#Folder and not recursive - stop
-		if vm_shared.obj_is_folder(obj) and not args.recursive:
+		if vm_shared.object_is_folder(obj) and not args.recursive:
 			raise Exception('Path is a folder - use -r to remove.')
 
 		#Remove
 		sys.stdout.write('Removing "'+path+'"...')
 		sys.stdout.flush()
 		try:
-			vm_shared.obj_remove(server_obj,obj)
+			vm_shared.object_remove(server_obj,obj)
 			print('success')
 		except Exception:
 			print('fail')

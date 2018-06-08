@@ -54,14 +54,14 @@ if __name__=='__main__':
 			raise Exception('Source "'+src+'" does not exist.')
 
 		#Source cannot be a datacenter
-		if not vm_shared.obj_is_vm(src_obj):
+		if not vm_shared.object_is_vm(src_obj):
 			raise Exception('Source object must be a VM.')
 
 		#Get destination object
 		dst_obj=vm_shared.object_from_str(server_obj,dst)
 
 		#Destination exists and is a VM - stop
-		if dst_obj and vm_shared.obj_is_vm(dst_obj):
+		if dst_obj and vm_shared.object_is_vm(dst_obj):
 			raise Exception('"'+dst+'" exists.')
 
 		#If destination doesn't exist, see if parent does
@@ -80,11 +80,11 @@ if __name__=='__main__':
 				raise Exception('Destination "'+dst+'/'+new_machine_name+'" already exists.')
 
 		#Parent doesn't exist - stop
-		if dst_obj==None or (not vm_shared.obj_is_datacenter(dst_obj) and not vm_shared.obj_is_folder(dst_obj)):
+		if dst_obj==None or (not vm_shared.object_is_datacenter(dst_obj) and not vm_shared.object_is_folder(dst_obj)):
 			raise Exception('Destination "'+dst+'" does not exist.')
 
 		#Parent is a datacenter - stop
-		if vm_shared.obj_is_datacenter(dst_obj):
+		if vm_shared.object_is_datacenter(dst_obj):
 			raise Exception('Destination cannot be a datacenter.')
 
 		#Get Datastore
