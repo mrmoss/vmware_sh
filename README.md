@@ -26,11 +26,12 @@ That's it.
 
 # Todo
 1. vm-migrate
-2. vm-permission-add
-3. vm-permission-rm
-4. vm-ifconfig
-5. vm-ifconfig-mv
-6. vm-ifconfig-rm
+2. vm-permission-ls
+3. vm-permission-add
+4. vm-permission-rm
+5. vm-ifconfig-ls
+6. vm-ifconfig-mv
+7. vm-ifconfig-rm
 
 # Usage examples
 ## Standard usage
