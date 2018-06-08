@@ -26,6 +26,12 @@ if __name__=='__main__':
 		#Get Object
 		obj=vm_shared.object_from_str(server_obj,path)
 
+		#Object doesn't exist - stop
+		if obj==None:
+			if args.force:
+				exit(0)
+			raise Exception('Path does not exist.')
+
 		#Datacenter - stop
 		if vm_shared.obj_is_datacenter(obj):
 			raise Exception('Path cannot be a datacenter.')
