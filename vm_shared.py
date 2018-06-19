@@ -9,6 +9,7 @@ import pyVmomi
 import socket
 import ssl
 import sys
+import threading
 import time
 
 def normalize_path_str(path):
@@ -689,6 +690,8 @@ def mk_portgroup(host_obj,vswitch_name,portgroup_name,vlan_id,allow_promiscuous=
 	host_obj.configManager.networkSystem.AddPortGroup(portgrp=portgroup_spec)
 
 #Internal helpers...don't use?
+wait_lock=threading.Lock()
+
 def object_from_str_parent_m(parent,paths):
 	if len(paths)<=0:
 		return parent
@@ -712,48 +715,20 @@ def list_structures_helper_m(parent_path,obj_path,full_paths):
 		return obj_path
 	return normalize_path_str(parent_path)+'/'+obj_path
 
-def wait_for_tasks_m(service_instance, tasks):
-	property_collector = service_instance.content.propertyCollector
-	task_list = [str(task) for task in tasks]
-	# Create filter
-	obj_specs = [pyVmomi.vmodl.query.PropertyCollector.ObjectSpec(obj=task)
-				 for task in tasks]
-	property_spec = pyVmomi.vmodl.query.PropertyCollector.PropertySpec(type=pyVmomi.vim.Task,
-															   pathSet=[],
-															   all=True)
-	filter_spec = pyVmomi.vmodl.query.PropertyCollector.FilterSpec()
-	filter_spec.objectSet = obj_specs
-	filter_spec.propSet = [property_spec]
-	pcfilter = property_collector.CreateFilter(filter_spec, True)
-	try:
-		version, state = None, None
-		# Loop looking for updates till the state moves to a completed state.
-		while len(task_list):
-			update = property_collector.WaitForUpdates(version)
-			for filter_set in update.filterSet:
-				for obj_set in filter_set.objectSet:
-					task = obj_set.obj
-					for change in obj_set.changeSet:
-						if change.name == 'info':
-							state = change.val.state
-						elif change.name == 'info.state':
-							state = change.val
-						else:
-							continue
-
-						if not str(task) in task_list:
-							continue
-
-						if state == pyVmomi.vim.TaskInfo.State.success:
-							# Remove task from taskList
-							task_list.remove(str(task))
-						elif state == pyVmomi.vim.TaskInfo.State.error:
-							raise task.info.error
-			# Move to next version
-			version = update.version
-	finally:
-		if pcfilter:
-			pcfilter.Destroy()
+def wait_for_tasks_m(service_instance,tasks):
+	while True:
+		try:
+			done=True
+			for task in tasks:
+				info=task.info
+				if info.state==pyVmomi.vim.TaskInfo.State.running or info.state==pyVmomi.vim.TaskInfo.State.queued:
+					done=False
+					break
+			if done:
+				break
+		except Exception:
+			pass
+		time.sleep(0.1)
 
 def get_snapshot_objects_recursive_m(snapshots,snapshot_path,snapshot_obj):
 	if len(snapshot_obj.childSnapshotList)>0:
