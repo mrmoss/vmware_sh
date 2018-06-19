@@ -393,7 +393,7 @@ def vm_snapshot_revert(server_obj,snapshot_obj):
 	except Exception as error:
 		raise Exception('Unexpected error - '+str(error))
 
-def vm_copy(server_obj,from_vm_obj,to_folder_obj,to_name,from_snapshot_obj=None,to_host_obj=None,to_datastore_obj=None):
+def vm_copy_nowait(server_obj,from_vm_obj,to_folder_obj,to_name,from_snapshot_obj=None,to_host_obj=None,to_datastore_obj=None):
 	relospec=pyVmomi.vim.vm.RelocateSpec()
 
 	if not to_host_obj:
@@ -417,7 +417,25 @@ def vm_copy(server_obj,from_vm_obj,to_folder_obj,to_name,from_snapshot_obj=None,
 
 	try:
 		clone_spec=pyVmomi.vim.vm.CloneSpec(location=relospec,template=False,powerOn=False,snapshot=from_snapshot_obj,memory=False)
-		wait_for_tasks_m(server_obj['si'],[from_vm_obj.Clone(folder=to_folder_obj,name=to_name,spec=clone_spec)])
+		return from_vm_obj.Clone(folder=to_folder_obj,name=to_name,spec=clone_spec)
+
+	except pyVmomi.vim.fault.NoPermission:
+		raise Exception('Insufficient permissions')
+
+	except pyVmomi.vim.fault.InvalidState:
+		raise Exception('VM is in an invalid state.')
+
+	except pyVmomi.vmodl.fault.InvalidArgument as error:
+		if isinstance(error.faultCause,pyVmomi.vim.fault.DatacenterMismatch):
+			raise Exception('Datacenter change - must specify new datastore and host.')
+		raise
+
+	except Exception as error:
+		raise Exception('Unexpected error - '+str(error))
+
+def vm_copy(server_obj,from_vm_obj,to_folder_obj,to_name,from_snapshot_obj=None,to_host_obj=None,to_datastore_obj=None):
+	try:
+		wait_for_tasks_m(server_obj['si'],[vm_copy_nowait(server_obj,from_vm_obj,to_folder_obj,to_name,from_snapshot_obj,to_host_obj,to_datastore_obj)])
 
 	except pyVmomi.vim.fault.NoPermission:
 		raise Exception('Insufficient permissions')
