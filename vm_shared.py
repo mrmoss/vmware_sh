@@ -33,34 +33,56 @@ def parse_password_csv_file(filename):
 		rows.append(row)
 	return rows
 
-def verbose_login(args):
+def verbose_login(args,save_password=False,password=None):
 	server_obj=None
 	login=parse_login_line(args.login)
 	sys.stderr.write('Attempting to connect as "'+login['user']+'" to "'+login['server']+'"...\n')
 
-	if args.password_file:
+	password_stdin=hasattr(args,'password_stdin') and args.password_stdin
+	password_file=hasattr(args,'password_file') and args.password_file
+
+	#Passed password as arg
+	if password:
+		server_obj=connect_server(login['server'],login['user'],password,save_password)
+
+	#Get password from stdin
+	elif password_stdin:
+		password=input()
+		try:
+			server_obj=connect_server(login['server'],login['user'],password,save_password)
+		except Exception as error:
+			sys.stderr.write('\t\tError: '+str(error)+'\n')
+
+	#Get password from password csv file
+	elif password_file:
 		sys.stderr.write('\tLooking for passwords in "'+args.password_file+'"...\n')
 		for row in parse_password_csv_file(args.password_file):
 			if row[0]==login['user']+'@'+login['server']:
 				password=row[1]
 				try:
-					server_obj=connect_server(login['server'],login['user'],password)
+					server_obj=connect_server(login['server'],login['user'],password,save_password)
 					break
 				except Exception as error:
 					sys.stderr.write('\t\tError: '+str(error)+'\n')
 		if not server_obj:
 			sys.stderr.write('\tNo valid password found in password file\n')
-	if not args.password_file or not server_obj:
+
+	#Above failed, prompt for password
+	if not server_obj and not password_stdin and not password_file:
 		password=getpass.getpass(prompt='\tPassword: ')
-		server_obj=connect_server(login['server'],login['user'],password)
+		server_obj=connect_server(login['server'],login['user'],password,save_password)
+
 	sys.stderr.write('\tConnected\n\n')
 	return server_obj
 
-def connect_server(server,user,password):
+def connect_server(server,user,password,save_password=False):
 	try:
 		si=pyVim.connect.SmartConnect(host=server,user=user,pwd=password,sslContext=ssl.create_default_context())
 		content=si.RetrieveContent()
-		return {'si':si,'content':content}
+		obj={'si':si,'content':content,'server':server,'user':user}
+		if save_password:
+			obj['password']=password
+		return obj
 
 	except pyVmomi.vim.fault.InvalidLogin:
 		raise Exception('Login error')
@@ -72,8 +94,11 @@ def connect_server(server,user,password):
 		raise Exception('Unexpected error - '+str(error))
 
 def disconnect_server(server_obj):
-	if server_obj and 'si' in server_obj and server_obj['si']:
-		pyVim.connect.Disconnect(server_obj['si'])
+	try:
+		if server_obj and 'si' in server_obj and server_obj['si']:
+			pyVim.connect.Disconnect(server_obj['si'])
+	except Exception:
+		pass
 
 def get_path_parent(path):
 	return normalize_path_str('/'.join(path.split('/')[:-1]))
@@ -436,11 +461,10 @@ def mk_folder(server_obj,parent_obj,new_folder_name,full_path):
 	try:
 		if object_is_datacenter(parent_obj):
 			parent_obj=parent_obj.vmFolder
-
 		parent_obj.CreateFolder(new_folder_name)
 		full_path=normalize_path_str(full_path)
 
-		#Wait for folder creation (seems more reliable than the wait_for_tasks in this specific instance...
+		#Wait for folder creation (seems more reliable than the wait_for_tasks in this specific instance)...
 		while True:
 			time.sleep(0.1)
 			if object_from_str(server_obj,full_path):
@@ -648,10 +672,27 @@ def change_interface_network(server_obj,vm_obj,nic_obj,new_network_obj):
 	except Exception as error:
 		raise Exception('Unexpected error - '+str(error))
 
+def mk_vswitch(host_obj,vswitch_name,port_count=56):
+	vss_spec=pyVmomi.vim.host.VirtualSwitch.Specification()
+	vss_spec.numPorts=port_count
+	host_obj.configManager.networkSystem.AddVirtualSwitch(vswitchName=vswitch_name,spec=vss_spec)
 
+def del_vswitch(host_obj,vswitch_name):
+	host_obj.configManager.networkSystem.RemoveVirtualSwitch(vswitch_name)
 
+def mk_portgroup(host_obj,vswitch_name,portgroup_name,vlan_id,allow_promiscuous=False,allow_forged_transmits=True,allow_mac_changes=True):
+	portgroup_spec=pyVmomi.vim.host.PortGroup.Specification()
+	portgroup_spec.vswitchName=vswitch_name
+	portgroup_spec.name=portgroup_name
+	portgroup_spec.vlanId=vlan_id
 
+	secpol=pyVmomi.vim.host.NetworkPolicy.SecurityPolicy()
+	secpol.allowPromiscuous=allow_promiscuous
+	secpol.forgedTransmits=allow_forged_transmits
+	secpol.macChanges=allow_mac_changes
+	portgroup_spec.policy=pyVmomi.vim.host.NetworkPolicy(security=secpol)
 
+	host_obj.configManager.networkSystem.AddPortGroup(portgrp=portgroup_spec)
 
 #Internal helpers...don't use?
 def object_from_str_parent_m(parent,paths):

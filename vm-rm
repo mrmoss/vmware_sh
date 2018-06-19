@@ -10,7 +10,9 @@ if __name__=='__main__':
 	try:
 		#Setup cli parser
 		parser=argparse.ArgumentParser(description='Remove a folder or VM.')
-		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		pass_group=parser.add_mutually_exclusive_group(required=False)
+		pass_group.add_argument('-s',action='store_true',dest='password_stdin',help='Take password from stdin.')
+		pass_group.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
 		parser.add_argument('-f',action='store_true',dest='force',help='Ignore snapshot does not exist errors.')
 		parser.add_argument('-r',action='store_true',dest='recursive',help='If path is a folder, you must use this flag to remove it.')
 		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')

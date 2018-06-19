@@ -12,11 +12,13 @@ if __name__=='__main__':
 	try:
 		#Setup cli parser
 		parser=argparse.ArgumentParser(description='Copy VM (recursive copying/globbing is not supported...).')
-		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		pass_group=parser.add_mutually_exclusive_group(required=False)
+		pass_group.add_argument('-s',action='store_true',dest='password_stdin',help='Take password from stdin.')
+		pass_group.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
 		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')
 		parser.add_argument('source',metavar='source',type=str,help='Source folder or VM.')
 		parser.add_argument('destination',metavar='destination',type=str,help='Destination folder or new VM name.')
-		parser.add_argument('-s',metavar='snapshot_name',action='store',type=str,dest='snapshot',help='Name of a snapshot on source to clone from.')
+		parser.add_argument('-S',metavar='snapshot_name',action='store',type=str,dest='snapshot',help='Name of a snapshot on source to clone from.')
 		parser.add_argument('-n',action='store_true',dest='snapshot_number',help='Use snapshot as a number instead of name.')
 		parser.add_argument('--to-datastore',action='store',type=str,dest='to_datastore',help='New datastore for the cloned VM (default is the src VM\'s datastore).')
 		parser.add_argument('--to-host',action='store',type=str,dest='to_host',help='New host for the cloned VM (default is the src VM\'s host).')
@@ -53,7 +55,7 @@ if __name__=='__main__':
 		if src_obj==None:
 			raise Exception('Source "'+src+'" does not exist.')
 
-		#Source cannot be a datacenter
+		#Source must be a VM
 		if not vm_shared.object_is_vm(src_obj):
 			raise Exception('Source object must be a VM.')
 

@@ -33,6 +33,7 @@ That's it.
 ## Standard usage
 ```
 ./vm-X -h - show help
+echo 'password' | ./vm-X -s - Get password from stdin.
 ./vm-X -p PASSWORD_FILE - Use this file to lookup usernames and passwords.
 
 Example password file:
@@ -390,7 +391,7 @@ Cloning "/Alpha Datacenter/base/linux/arch" to "/Alpha Datacenter/arch-test2"...
 
 ## Copy virtual machine from a snapshot name
 ```
-./vm-cp mike@vc.example.com 'Alpha Datacenter/base/linux/centos' 'Alpha Datacenter/centos-test1' -s 'Base Snapshot/Experiment 2'
+./vm-cp mike@vc.example.com 'Alpha Datacenter/base/linux/centos' 'Alpha Datacenter/centos-test1' -S 'Base Snapshot/Experiment 2'
 Attempting to connect as "mike" to "vc.example.com"...
 	Connected
 
@@ -399,7 +400,7 @@ Cloning "/Alpha Datacenter/base/linux/centos" to "/Alpha Datacenter/centos-test1
 
 ## Copy virtual machine from a snapshot index
 ```
-./vm-cp mike@vc.example.com 'Alpha Datacenter/base/linux/centos' 'Alpha Datacenter/centos-test2' -n -s 1
+./vm-cp mike@vc.example.com 'Alpha Datacenter/base/linux/centos' 'Alpha Datacenter/centos-test2' -n -S 1
 Attempting to connect as "mike" to "vc.example.com"...
 	Connected
 

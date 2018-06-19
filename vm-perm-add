@@ -10,7 +10,9 @@ if __name__=='__main__':
 	try:
 		#Setup cli parser
 		parser=argparse.ArgumentParser(description='Add permissions to folder and VM structures (globbing is not supported...).')
-		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		pass_group=parser.add_mutually_exclusive_group(required=False)
+		pass_group.add_argument('-s',action='store_true',dest='password_stdin',help='Take password from stdin.')
+		pass_group.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
 		parser.add_argument('login',metavar='user@server',type=str,help='Login as user into server.')
 		parser.add_argument('role',type=str,help='Permission role to add to paths.')
 		parser.add_argument('domain_user',metavar='domain/user',type=str,help='Domain user to add permissions to.')

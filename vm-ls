@@ -10,7 +10,9 @@ if __name__=='__main__':
 	try:
 		#Setup cli parser
 		parser=argparse.ArgumentParser(description='List folder and VM structures (globbing is not supported...).')
-		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		pass_group=parser.add_mutually_exclusive_group(required=False)
+		pass_group.add_argument('-s',action='store_true',dest='password_stdin',help='Take password from stdin.')
+		pass_group.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
 		group=parser.add_mutually_exclusive_group(required=False)
 		group.add_argument('-f',action='store_true',dest='folders_only',help='Only show folders.')
 		group.add_argument('-m',action='store_true',dest='machines_only',help='Only show VMs.')

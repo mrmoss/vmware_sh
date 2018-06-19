@@ -10,7 +10,9 @@ if __name__=='__main__':
 	try:
 		#Setup cli parser
 		parser=argparse.ArgumentParser(description='Delete permissions from folder and VM structures (globbing is not supported...).')
-		parser.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
+		pass_group=parser.add_mutually_exclusive_group(required=False)
+		pass_group.add_argument('-s',action='store_true',dest='password_stdin',help='Take password from stdin.')
+		pass_group.add_argument('-p',action='store',type=str,dest='password_file',help='CSV file with "user@server,password" lines.')
 		parser.add_argument('-f',action='store_true',dest='force',help='Ignore permission does not exist on object errors.')
 		parser.add_argument('--role',action='store',type=str,dest='role',help='Permission role to delete from paths.')
 		parser.add_argument('--domain-user',action='store',type=str,dest='domain_user',help='Domain user to delete permissions from.')
