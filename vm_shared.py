@@ -33,7 +33,7 @@ def parse_password_csv_file(filename):
 		rows.append(row)
 	return rows
 
-def verbose_login(args,save_password=False,password=None):
+def verbose_login(args,password=None):
 	server_obj=None
 	login=parse_login_line(args.login)
 	sys.stderr.write('Attempting to connect as "'+login['user']+'" to "'+login['server']+'"...\n')
@@ -43,13 +43,13 @@ def verbose_login(args,save_password=False,password=None):
 
 	#Passed password as arg
 	if password:
-		server_obj=connect_server(login['server'],login['user'],password,save_password)
+		server_obj=connect_server(login['server'],login['user'],password)
 
 	#Get password from stdin
 	elif password_stdin:
 		password=input()
 		try:
-			server_obj=connect_server(login['server'],login['user'],password,save_password)
+			server_obj=connect_server(login['server'],login['user'],password)
 		except Exception as error:
 			sys.stderr.write('\t\tError: '+str(error)+'\n')
 
@@ -60,7 +60,7 @@ def verbose_login(args,save_password=False,password=None):
 			if row[0]==login['user']+'@'+login['server']:
 				password=row[1]
 				try:
-					server_obj=connect_server(login['server'],login['user'],password,save_password)
+					server_obj=connect_server(login['server'],login['user'],password)
 					break
 				except Exception as error:
 					sys.stderr.write('\t\tError: '+str(error)+'\n')
@@ -70,19 +70,16 @@ def verbose_login(args,save_password=False,password=None):
 	#Above failed, prompt for password
 	if not server_obj and not password_stdin and not password_file:
 		password=getpass.getpass(prompt='\tPassword: ')
-		server_obj=connect_server(login['server'],login['user'],password,save_password)
+		server_obj=connect_server(login['server'],login['user'],password)
 
 	sys.stderr.write('\tConnected\n\n')
 	return server_obj
 
-def connect_server(server,user,password,save_password=False):
+def connect_server(server,user,password):
 	try:
 		si=pyVim.connect.SmartConnect(host=server,user=user,pwd=password,sslContext=ssl.create_default_context())
 		content=si.RetrieveContent()
-		obj={'si':si,'content':content,'server':server,'user':user}
-		if save_password:
-			obj['password']=password
-		return obj
+		return {'si':si,'content':content}
 
 	except pyVmomi.vim.fault.InvalidLogin:
 		raise Exception('Login error')
@@ -94,11 +91,8 @@ def connect_server(server,user,password,save_password=False):
 		raise Exception('Unexpected error - '+str(error))
 
 def disconnect_server(server_obj):
-	try:
-		if server_obj and 'si' in server_obj and server_obj['si']:
-			pyVim.connect.Disconnect(server_obj['si'])
-	except Exception:
-		pass
+	if server_obj and 'si' in server_obj and server_obj['si']:
+		pyVim.connect.Disconnect(server_obj['si'])
 
 def get_path_parent(path):
 	return normalize_path_str('/'.join(path.split('/')[:-1]))
