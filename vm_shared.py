@@ -86,7 +86,7 @@ def connect_server(server,user,password):
 		raise Exception('Login error')
 
 	except socket.error:
-		raise Exception('Could not connect to "'+server_str[1]+'"')
+		raise Exception('Could not connect to "'+server+'"')
 
 	except Exception as error:
 		raise Exception('Unexpected error - '+str(error))
